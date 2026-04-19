@@ -1,4 +1,4 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
@@ -15,11 +15,12 @@ public class PlayerController : MonoBehaviour
 
     //private int count;
 
-    // Æ´µ¥´ÊºËĞÄ
+    // æ‹¼å•è¯æ ¸å¿ƒ
     private string collectedLetters = "";
     public string targetWord = "APPLE";
     public TextMeshProUGUI countText; // the score TMS object
-    public GameObject winPanel; // Ê¤ÀûÃæ°å
+    public GameObject winPanel; // èƒœåˆ©é¢æ¿
+    public GameObject losePanel; // å¤±è´¥é¢æ¿
 
     public GameObject settingPanel;
 
@@ -33,15 +34,28 @@ public class PlayerController : MonoBehaviour
     // Speed at which the player moves.
     public float speed = 0;
 
-    // ÓÃÀ´»ñÈ¡Ö÷Ïà»ú·½Ïò
+    // ç”¨æ¥è·å–ä¸»ç›¸æœºæ–¹å‘
     private Camera mainCam;
 
-    // ÌøÔ¾Ïà¹Ø²ÎÊı
-    public float jumpForce = 5f; // ÌøÔ¾Á¦¶È£¬¿ÉÔÚInspectorµ÷Õû
-    private bool isGrounded = true; // ÊÇ·ñÔÚµØÃæÉÏ
-    public Transform groundCheck; // µØÃæ¼ì²âµã£¨ĞèÒªÔÚInspectorÍÏÈë£©
-    public float groundCheckRadius = 0.2f; // ¼ì²â·¶Î§
-    public LayerMask groundLayer; // µØÃæ²ã¼¶£¨ĞèÒªÔÚInspectorÑ¡Ôñ£©
+    // è·³è·ƒç›¸å…³å‚æ•°
+    public float jumpForce = 5f; // è·³è·ƒåŠ›åº¦ï¼Œå¯åœ¨Inspectorè°ƒæ•´
+    private bool isGrounded = true; // æ˜¯å¦åœ¨åœ°é¢ä¸Š
+    public Transform groundCheck; // åœ°é¢æ£€æµ‹ç‚¹
+    public float groundCheckRadius = 0.2f; // æ£€æµ‹èŒƒå›´
+    public LayerMask groundLayer; // åœ°é¢å±‚çº§
+
+    // æ‰è½å¤±è´¥é€»è¾‘
+    public float fallThreshold = -10.5f; // ä½äºè¿™ä¸ªé«˜åº¦åˆ¤å®šä¸ºå¤±è´¥
+    private bool isGameOver = false;
+
+    // åŠ¨ç”»æ§åˆ¶
+    public Animator snakeAnimator; 
+    public float eatAnimDuration = 0.5f; // åƒåŠ¨ç”»æŒç»­æ—¶é—´
+
+    // æ—‹è½¬é€Ÿåº¦
+    public float turnSpeed = 15f;
+
+    private bool isEating = false;
 
     // Start is called before the first frame update.
     void Start()
@@ -49,10 +63,15 @@ public class PlayerController : MonoBehaviour
         // Get and store the Rigidbody component attached to the player.
         rb = GetComponent<Rigidbody>();
 
-        mainCam = Camera.main; // ×Ô¶¯»ñÈ¡Ö÷Ïà»ú
+        mainCam = Camera.main; // è‡ªåŠ¨è·å–ä¸»ç›¸æœº
 
         ResumeGame();
+
+        // è‡ªåŠ¨è·å–è›‡èº«ä¸Šçš„Animator
+        if (snakeAnimator == null)
+            snakeAnimator = GetComponent<Animator>();
     }
+
 
     // This function is called when a move input is detected.
     void OnMove(InputValue movementValue)
@@ -65,10 +84,10 @@ public class PlayerController : MonoBehaviour
         movementY = movementVector.y;
     }
 
-    // ÌøÔ¾ÊäÈë¼ì²â£¨Input System×Ô¶¯Ê¶±ğ¿Õ¸ñ£©
+    // è·³è·ƒè¾“å…¥æ£€æµ‹
     void OnJump()
     {
-        // Ö»ÓĞÔÚµØÃæÉÏ²ÅÄÜÌø£¬·ÀÖ¹¿ÕÖĞÎŞÏŞÌø
+        // é˜²æ­¢ç©ºä¸­æ— é™è·³
         if (isGrounded)
         {
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
@@ -79,20 +98,20 @@ public class PlayerController : MonoBehaviour
     // FixedUpdate is called once per fixed frame-rate frame.
     void FixedUpdate()
     {
-        // µØÃæ¼ì²â£¨Ã¿Ö¡ÅĞ¶ÏÊÇ·ñÂäµØ£©
+        // åœ°é¢æ£€æµ‹
         isGrounded = Physics.CheckSphere(groundCheck.position, groundCheckRadius, groundLayer);
 
-        // ÒÆ¶¯·½Ïò¸úËæ¾µÍ·
+        // ç§»åŠ¨æ–¹å‘è·Ÿéšé•œå¤´
         Vector3 camForward = mainCam.transform.forward;
         Vector3 camRight = mainCam.transform.right;
 
-        // Ïû³ıYÖáÓ°Ïì£¬±£Ö¤Ë®Æ½ÒÆ¶¯
+        // æ¶ˆé™¤Yè½´å½±å“ï¼Œä¿è¯æ°´å¹³ç§»åŠ¨
         camForward.y = 0;
         camRight.y = 0;
         camForward.Normalize();
         camRight.Normalize();
 
-        // ¼ÆËãÏà¶Ô¾µÍ·µÄÒÆ¶¯·½Ïò
+        // è®¡ç®—ç›¸å¯¹é•œå¤´çš„ç§»åŠ¨æ–¹å‘
         Vector3 movement = camForward * movementY + camRight * movementX;
 
         // Create a 3D movement vector using the X and Y inputs.
@@ -100,6 +119,38 @@ public class PlayerController : MonoBehaviour
 
         // Apply force to the Rigidbody to move the player.
         rb.AddForce(movement * speed);
+
+        // åˆ‡æ¢Walk/IdleåŠ¨ç”»
+        bool isMoving = movement.magnitude > 0.1f;
+        if (!isEating)
+        {
+            snakeAnimator.SetBool("IsWalking", isMoving);
+        }
+
+        // è®©è›‡æœå‘ç§»åŠ¨æ–¹å‘
+        if (movement.magnitude > 0.01f)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(movement);
+            transform.rotation = Quaternion.Lerp(
+                transform.rotation,
+                targetRotation,
+                turnSpeed * Time.fixedDeltaTime
+            );
+        }
+    }
+
+    // åƒå­—æ¯åŠ¨ç”»
+    IEnumerator PlayEatAnimation()
+    {
+        isEating = true;
+
+        snakeAnimator.SetBool("IsWalking", false);
+        snakeAnimator.SetBool("IsEating", true);
+
+        yield return new WaitForSeconds(eatAnimDuration);
+        snakeAnimator.SetBool("IsEating", false);
+
+        isEating = false;
     }
 
     void OnTriggerEnter(Collider other)
@@ -136,7 +187,7 @@ public class PlayerController : MonoBehaviour
             char nextExpected = GetNextExpectedLetter();
             char got = char.ToUpper(letterComp.letter);
 
-            // Ö»ÓĞ¶ÔµÄ²ÅÊÕ£¬´íµÄ²»ÊÕ
+            // åªæœ‰å¯¹çš„æ‰æ”¶ï¼Œé”™çš„ä¸æ”¶
             if (got == nextExpected)
             {
                 audioManager.PlayHitSound();
@@ -144,11 +195,14 @@ public class PlayerController : MonoBehaviour
                 other.gameObject.SetActive(false);
                 UpdateCollectedUI();
                 CheckWin();
+
+                // æ”¶é›†å­—æ¯æ’­æ”¾EatåŠ¨ç”»
+                StartCoroutine(PlayEatAnimation());
             }
         }
     }
 
-    // »ñÈ¡ÏÂÒ»¸öÓ¦¸ÃÊÕ¼¯µÄ×ÖÄ¸
+    // è·å–ä¸‹ä¸€ä¸ªåº”è¯¥æ”¶é›†çš„å­—æ¯
     char GetNextExpectedLetter()
     {
         if (collectedLetters.Length >= targetWord.Length)
@@ -158,13 +212,13 @@ public class PlayerController : MonoBehaviour
     }
 
 
-    // ¸üĞÂÒÑÊÕ¼¯×ÖÄ¸ÏÔÊ¾
+    // æ›´æ–°å·²æ”¶é›†å­—æ¯æ˜¾ç¤º
     void UpdateCollectedUI()
     {
         countText.text = "Letters: " + collectedLetters;
     }
 
-    // ¼ì²éÊÇ·ñÆ´³ö APPLE
+    // æ£€æŸ¥æ˜¯å¦æ‹¼å‡º APPLE
     void CheckWin()
     {
         if (collectedLetters == targetWord)
@@ -176,12 +230,12 @@ public class PlayerController : MonoBehaviour
     void WinGame()
     {
         countText.text = "YOU WIN! WORD: " + targetWord;
-        // Í£Ö¹ÒÆ¶¯
+        // åœæ­¢ç§»åŠ¨
         rb.velocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
         speed = 0;
 
-        // Ê¤ÀûÃæ°å´ò¿ª
+        // èƒœåˆ©é¢æ¿æ‰“å¼€
         if (winPanel != null)
             winPanel.SetActive(true);
 
@@ -203,6 +257,19 @@ public class PlayerController : MonoBehaviour
         settingPanel.SetActive(false);
     }
 
+    // æ¸¸æˆå¤±è´¥é€»è¾‘
+    void GameOver()
+    {
+        isGameOver = true;
+        countText.text = "YOU FELL IN THE WATER!";
+        rb.velocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+        speed = 0;
+
+        if (losePanel != null)
+            losePanel.SetActive(true);
+    }
+
     void Update()
     {
         if (Keyboard.current.escapeKey.wasPressedThisFrame)
@@ -211,6 +278,12 @@ public class PlayerController : MonoBehaviour
                 ResumeGame();
             else
                 PauseGame();
+        }
+
+        // æ‰è½æ£€æµ‹
+        if (transform.position.y < fallThreshold)
+        {
+            GameOver();
         }
     }
 }
