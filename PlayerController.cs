@@ -44,9 +44,7 @@ public class PlayerController : MonoBehaviour
         ResumeGame();
         UpdateCoinUI();
 
-        // ==============================================
-        // 【强制开局隐藏】—— 这行绝对能修好！
-        // ==============================================
+   
         HideAllUI();
     }
 
